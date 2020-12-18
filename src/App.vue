@@ -27,7 +27,10 @@
                         <v-list-item-title class="title">
                           {{ hours }}
                         </v-list-item-title>
-                        <span>Next Prayer</span>
+                        <p>
+                          <span>Next Prayer</span
+                          >{{ ` ${commingPray.name}   ${commingPray.hour}` }}
+                        </p>
                       </v-list-item-content>
                     </v-list-item>
                   </v-col>
@@ -36,7 +39,7 @@
               <!-- subheader -->
               <v-row justify="space-between" align="center">
                 <v-col align="star" justify="center">
-                  <h3>Muharram 1442</h3>
+                  <h3>Muharram {{ hijri }}</h3>
                 </v-col>
                 <v-col align="end" justify="center">
                   <span>{{ getCurrentDay() }}</span>
@@ -133,6 +136,7 @@
 
 <script>
 const axios = require("axios");
+const moment = require("moment");
 export default {
   data: () => ({
     prays: [
@@ -207,6 +211,8 @@ export default {
     prays_api: [],
     city: "",
     hours: "",
+    hijri: "",
+    commingPray: {},
   }),
   methods: {
     getCurrentDay: function() {
@@ -259,10 +265,15 @@ export default {
           "https://api.pray.zone/v2/times/day.json?city=jakarta&date=2020-12-18"
         )
         .then((response) => response.data.results);
+      let hijri = data.datetime[0].date.hijri;
+      this.hijri = hijri.split("-")[0];
       let prayer_time = data.datetime[0].times;
       let arryTime = Object.entries(prayer_time);
+
+      let hourPray = [];
       let resultPray = [];
       for (let [index, item] of arryTime.entries()) {
+        hourPray.push(item[1]);
         resultPray.push({
           title: item[0],
           time: item[1],
@@ -271,36 +282,48 @@ export default {
           is_active: true,
         });
       }
-      console.log(arryTime, "ddd");
+
+      let myEnd = "";
+      let myStart = moment().format("HH:mm");
+      let result = [];
+      for (let v of hourPray.sort()) {
+        var beginningTime = moment(myStart, "h:mm");
+        var endTime = moment(v, "h:mm");
+        if (beginningTime.isBefore(endTime) == true) {
+          result.push(v);
+        }
+      }
+      let finalRes = result[0];
+
+      const obj = {
+        id: 1,
+        name: "Den",
+      };
+
+      function getKeyByValue(obj, value) {
+        return Object.entries(obj).find(([, name]) => value === name);
+      }
+
+      const [key] = getKeyByValue(prayer_time, finalRes);
+      this.commingPray = { name: key, hour: finalRes };
       this.prays_api = resultPray;
       this.city = data.location.city;
     },
     showHours: function() {
-      var date = new Date();
-      var am_pm = "AM";
-      var hour = date.getHours();
-      if (hour >= 12) {
-        am_pm = "PM";
+      let nowDate = moment().format("DD/MM/YYYY hh:mm:ss");
+      let thenDate = moment().format("DD/MM/YYYY");
+      var then = `${thenDate} ${this.commingPray.hour}`;
+      let result = moment
+        .utc(
+          moment(then, "DD/MM/YYYY HH:mm:ss").diff(
+            moment(nowDate, "DD/MM/YYYY HH:mm:ss")
+          )
+        )
+        .format("HH:mm:ss");
+      if (result < 0) {
+        this.getPray();
       }
-      if (hour == 0) {
-        hour = 12;
-      }
-      if (hour > 12) {
-        hour = hour - 12;
-      }
-      if (hour < 10) {
-        hour = "0" + hour;
-      }
-
-      var minute = date.getMinutes();
-      if (minute < 10) {
-        minute = "0" + minute;
-      }
-      var sec = date.getSeconds();
-      if (sec < 10) {
-        sec = "0" + sec;
-      }
-      this.hours = `${hour}:${minute}:${sec}`;
+      this.hours = result;
     },
   },
   mounted() {
