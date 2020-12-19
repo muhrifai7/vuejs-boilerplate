@@ -3,8 +3,52 @@
     <v-main class="grey lighten-3 mb-3">
       <v-container>
         <v-row align="center" justify="center">
-          <v-col cols="6">
-            <v-sheet min-height="70vh" rounded="lg" class="pa-4">
+          <v-col>
+            <v-sheet rounded="lg" class="pa-4">
+              <v-row justify="center">
+                <v-dialog v-model="dialog" persistent max-width="290">
+                  <template
+                    v-slot:activator="{ on, attrs }"
+                    v-if="showNotification"
+                  >
+                    <v-btn color="primary" dark v-bind="attrs" v-on="on">
+                      <v-badge
+                        :content="messages"
+                        :value="messages"
+                        color="red"
+                        overlap
+                      >
+                        <v-icon medium color="white">
+                          mdi-chat-outline
+                        </v-icon>
+                      </v-badge>
+                    </v-btn>
+                  </template>
+                  <v-card>
+                    <v-card-title>
+                      Sudah Waktu Masuk {{ commingPray.name }}
+                    </v-card-title>
+                    <v-card-text>Sholat DuluYuk!.</v-card-text>
+                    <v-card-actions>
+                      <v-spacer></v-spacer>
+                      <v-btn
+                        color="green darken-1"
+                        text
+                        @click="dialog = false"
+                      >
+                        Batal
+                      </v-btn>
+                      <v-btn
+                        color="green darken-1"
+                        text
+                        @click="[(dialog = false), (messages = 0)]"
+                      >
+                        Baik
+                      </v-btn>
+                    </v-card-actions>
+                  </v-card>
+                </v-dialog>
+              </v-row>
               <!-- header -->
               <v-row justify="space-between" align="center">
                 <v-col align="star" justify="center">
@@ -75,7 +119,7 @@
                 <!-- <v-col> -->
                 <v-hover>
                   <v-card color="#ecf0f1" elevation="0" rounded="xl">
-                    <v-row justify="space-between" class="mr-2 ml-2">
+                    <v-row justify="space-between" class="mr-2 ml-2 isActive">
                       <div
                         align="start"
                         justify="center"
@@ -86,7 +130,7 @@
                             {{ item.icon_left }}
                           </v-icon>
                         </div>
-                        <div class="ma-1" id="isActive" justify="center">
+                        <div class="ma-1" justify="center">
                           {{ item.title }}
                         </div>
                       </div>
@@ -139,6 +183,11 @@ const axios = require("axios");
 const moment = require("moment");
 export default {
   data: () => ({
+    isMobile: false,
+    isActive: true,
+    dialog: false,
+    showNotification: true,
+    messages: 1,
     prays: [
       {
         title: "",
@@ -212,7 +261,7 @@ export default {
     city: "",
     hours: "",
     hijri: "",
-    commingPray: {},
+    commingPray: { name: "", hour: "" },
   }),
   methods: {
     getCurrentDay: function() {
@@ -260,11 +309,45 @@ export default {
       return (this.dates = dates.reverse());
     },
     getPray: async function() {
-      let data = await axios
-        .get(
-          "https://api.pray.zone/v2/times/day.json?city=jakarta&date=2020-12-18"
-        )
-        .then((response) => response.data.results);
+      let dateParams = moment().format("YYYY-MM-DD");
+      // let data = await axios
+      //   .get(
+      //     `https://api.pray.zone/v2/times/day.json?city=jakarta&date=2020-12-18`
+      //   )
+      //   .then((response) => response.data.results);
+      // console.log(data, "dataa");
+      let data = {
+        datetime: [
+          {
+            times: {
+              Asr: "15:17",
+              Dhuhr: "11:49",
+              Fajr: "04:18",
+              Imsak: "04:08",
+              Isha: "19:16",
+              Maghrib: "18:18",
+              Midnight: "23:11",
+              Sunrise: "05:34",
+              Sunset: "18:04",
+            },
+            date: {
+              timestamp: 1608249600,
+              gregorian: "2020-12-19",
+              hijri: "1442-05-03",
+            },
+          },
+        ],
+        location: {
+          latitude: 48.85661315917969,
+          longitude: 2.352221965789795,
+          elevation: 36.0,
+          city: "Jakarta",
+          country: "Republic of Indonesia",
+          country_code: "FR",
+          timezone: "Europe/Paris",
+          local_offset: 1.0,
+        },
+      };
       let hijri = data.datetime[0].date.hijri;
       this.hijri = hijri.split("-")[0];
       let prayer_time = data.datetime[0].times;
@@ -320,20 +403,49 @@ export default {
           )
         )
         .format("HH:mm:ss");
-      if (result < 0) {
+      if (result === "00:00:00") {
+        this.messages++;
+        this.showNotification = true;
         this.getPray();
       }
       this.hours = result;
     },
+    onResize() {
+      this.isMobile = window.innerWidth < 600;
+    },
   },
   mounted() {
+    console.log(this.$vuetify.breakpoint.width);
     this.getOneWeek();
     this.getPray();
     setInterval(() => {
       this.showHours();
     }, 1000);
+    this.onResize();
+
+    window.addEventListener("resize", this.onResize, { passive: true });
   },
-  computed: {},
+  computed: {
+    height() {
+      switch (this.$vuetify.breakpoint.name) {
+        case "xs":
+          return 220;
+        case "sm":
+          return 400;
+        case "md":
+          return 500;
+        case "lg":
+          return 600;
+        case "xl":
+          return 800;
+      }
+    },
+  },
+  beforeDestroy() {
+    if (typeof window === "undefined") return;
+
+    window.removeEventListener("resize", this.onResize, { passive: true });
+  },
 };
 </script>
 
@@ -351,9 +463,10 @@ export default {
   padding: 10px;
 }
 
-#isActive {
+.isActive {
   opacity: 0.6;
 }
+
 #time_index {
   font-size: 10px;
 }
